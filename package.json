@@ -1,0 +1,25 @@
+{
+  "name": "yacht",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@jetbrains/kotlin-css": "^1.0.0-pre.28",
+    "@jetbrains/kotlin-css-js": "^1.0.0-pre.28",
+    "@jetbrains/kotlin-styled": "^1.0.0-pre.28",
+    "inline-style-prefixer": "^4.0.2",
+    "react": "^16.3.2",
+    "react-dom": "^16.3.2",
+    "styled-components": "^3.2.6"
+  },
+  "devDependencies": {
+    "react-scripts-kotlin": "2.1.10"
+  },
+  "scripts": {
+    "start": "react-scripts-kotlin start",
+    "build": "react-scripts-kotlin build",
+    "eject": "react-scripts-kotlin eject",
+    "gen-idea-libs": "react-scripts-kotlin gen-idea-libs",
+    "get-types": "react-scripts-kotlin get-types --dest=src/types",
+    "postinstall": "npm run gen-idea-libs"
+  }
+}
