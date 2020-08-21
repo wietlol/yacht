@@ -2,6 +2,7 @@ package com.jitterted.yacht.ui.react
 
 import com.jitterted.yacht.domain.Game
 import com.jitterted.yacht.domain.ScoreCategory
+import com.jitterted.yacht.domain.ScoredCategory
 import kotlinx.css.BorderCollapse.collapse
 import kotlinx.css.BorderStyle.solid
 import kotlinx.css.borderCollapse
@@ -44,187 +45,213 @@ class GameUi : RComponent<RProps, GameState>()
 	override fun RBuilder.render()
 	{
 		styledDiv {
-			val game = state.game
+			val game: Game? = state.game
 			when
 			{
-				game == null ->
-				{
-					h1 { +"Yacht!" }
-					
-					button {
-						+"Start Game"
-						
-						attrs.onClickFunction = {
-							setState {
-								this.game = Game()
-									.also { it.start() }
-							}
+				game == null -> renderGameStart()
+				game.isOver -> renderGameOver(game)
+				else -> renderGameActive(game)
+			}
+		}
+	}
+	
+	private fun RBuilder.renderGameStart()
+	{
+		h1 { +"Yacht!" }
+		
+		button {
+			+"Start Game"
+			
+			attrs.onClickFunction = {
+				setState {
+					this.game = Game()
+						.also { it.start() }
+				}
+			}
+		}
+	}
+	
+	private fun RBuilder.renderGameOver(game: Game)
+	{
+		h1 { +"Game Over" }
+		
+		h3 { +"Your Score: ${game.score}" }
+		
+		renderRollTable {
+			val scoredCategories = game.scoredCategories()
+				.associateBy { it.scoreCategory }
+			ScoreCategory.values()
+				.map { it to scoredCategories.getValue(it) }
+				.forEach { (category, score) ->
+					tr {
+						td {
+							+category.name
+						}
+						td {
+							+score.diceRoll.asSequence().joinToString(" ")
+						}
+						td {
+							+score.score.toString()
 						}
 					}
 				}
-				game.isOver ->
-				{
-					h1 { +"Game Over" }
-					
-					h3 { +"Your Score: ${game.score}" }
-					
-					styledTable {
-						css {
-							borderCollapse = collapse
-							descendants("th, td") {
-								border(1.px, solid, Palette.foregroundColor)
-								borderCollapse = collapse
-								
-								padding(6.px)
-								minWidth = 80.px
-							}
-						}
-						tbody {
-							tr {
-								th { +"Category" }
-								th { +"Roll" }
-								th { +"Score" }
-							}
-							
-							val scoredCategories = game.scoredCategories()
-								.associateBy { it.scoreCategory }
-							ScoreCategory.values()
-								.map { it to scoredCategories.getValue(it) }
-								.forEach { (category, score) ->
-									tr {
-										td {
-											+category.name
-										}
-										td {
-											+score.diceRoll.asSequence().joinToString(" ")
-										}
-										td {
-											+score.score.toString()
-										}
-									}
-								}
-						}
-					}
-					
-					button {
-						+"Start New Game"
-						attrs.onClickFunction = {
-							setState {
-								this.game = Game()
-									.also { it.start() }
-							}
-						}
+		}
+		
+		button {
+			+"Start New Game"
+			attrs.onClickFunction = {
+				setState {
+					this.game = Game()
+						.also { it.start() }
+				}
+			}
+		}
+	}
+	
+	private fun RBuilder.renderGameActive(game: Game)
+	{
+		h1 { +"Roll Results" }
+		
+		h3 { +"Current Score: ${game.score}" }
+		
+		renderRollTable {
+			val scoredCategories = game.scoredCategories()
+				.associateBy { it.scoreCategory }
+			ScoreCategory.values()
+				.map { it to scoredCategories.getValue(it) }
+				.forEach { (category, score) ->
+					scoreRow(game, category, score)
+				}
+		}
+		
+		if (game.roundCompleted().not())
+		{
+			hr { }
+			
+			styledH2 {
+				+"You rolled:"
+				
+				css {
+					children("label:not(:last-child)") {
+						marginRight = 10.px
 					}
 				}
-				else ->
-				{
-					h1 { +"Roll Results" }
-					
-					h3 { +"Current Score: ${game.score}" }
-					
-					styledTable {
-						css {
-							borderCollapse = collapse
-							descendants("th, td") {
-								border(1.px, solid, Palette.foregroundColor)
-								borderCollapse = collapse
-								
-								padding(6.px)
-								minWidth = 80.px
-							}
-						}
-						tbody {
-							tr {
-								th { +"Category" }
-								th { +"Roll" }
-								th { +"Score" }
-							}
-							
-							val scoredCategories = game.scoredCategories()
-								.associateBy { it.scoreCategory }
-							ScoreCategory.values()
-								.map { it to scoredCategories.getValue(it) }
-								.forEach { (category, score) ->
-									scoreRow(game, category, score, assign = {
-										setState {
-											game.assignRollTo(category)
-										}
-									})
-								}
-						}
-					}
-					
-					if (game.roundCompleted().not())
-					{
-						hr { }
-						
-						styledH2 {
-							+"You rolled:"
-							
-							css {
-								children("label:not(:last-child)") {
-									marginRight = 10.px
-								}
-							}
-							
-							game.lastRoll.asSequence().forEachIndexed { index, roll ->
-								label {
-									input(checkBox) {
-										attrs {
-											disabled = game.canReRoll().not()
-											checked = state.selectedDiceIndices.contains(index)
-											onClickFunction = { event ->
-												val checked = (event.target as HTMLInputElement).checked
-												setState {
-													selectedDiceIndices = if (checked)
-														selectedDiceIndices
-															.plus(index)
-													else
-														selectedDiceIndices
-															.filter { it != index }
-												}
-											}
-										}
-									}
-									+roll.toString()
-								}
-							}
-						}
-						
-						button {
-							+"Re-roll"
-							
+				
+				game.lastRoll.asSequence().forEachIndexed { index, roll ->
+					label {
+						input(checkBox) {
 							attrs {
 								disabled = game.canReRoll().not()
-								
-								onClickFunction = {
+								checked = state.selectedDiceIndices.contains(index)
+								onClickFunction = { event ->
+									val checked = (event.target as HTMLInputElement).checked
 									setState {
-										val keptDice = game.lastRoll.asSequence().filterIndexed { index, _ -> selectedDiceIndices.contains(index) }.toList()
-										game.reRoll(keptDice)
-										selectedDiceIndices = emptyList()
+										selectedDiceIndices = if (checked)
+											selectedDiceIndices
+												.plus(index)
+										else
+											selectedDiceIndices
+												.filter { it != index }
 									}
 								}
 							}
 						}
+						+roll.toString()
 					}
+				}
+			}
+			
+			button {
+				+"Re-roll"
+				
+				attrs {
+					disabled = game.canReRoll().not()
 					
-					hr { }
-					
-					button {
-						+"Roll Dice"
-						
-						attrs {
-							disabled = game.roundCompleted().not()
-							
-							onClickFunction = {
-								setState {
-									game.rollDice()
-									selectedDiceIndices = emptyList()
-								}
-							}
+					onClickFunction = {
+						setState {
+							val keptDice = game.lastRoll.asSequence().filterIndexed { index, _ -> selectedDiceIndices.contains(index) }.toList()
+							game.reRoll(keptDice)
+							selectedDiceIndices = emptyList()
 						}
 					}
 				}
+			}
+		}
+		
+		hr { }
+		
+		button {
+			+"Roll Dice"
+			
+			attrs {
+				disabled = game.roundCompleted().not()
+				
+				onClickFunction = {
+					setState {
+						game.rollDice()
+						selectedDiceIndices = emptyList()
+					}
+				}
+			}
+		}
+	}
+	
+	private fun RBuilder.renderRollTable(body: RBuilder.() -> Unit)
+	{
+		styledTable {
+			css {
+				borderCollapse = collapse
+				descendants("th, td") {
+					border(1.px, solid, Palette.foregroundColor)
+					borderCollapse = collapse
+					
+					padding(6.px)
+					minWidth = 80.px
+				}
+			}
+			tbody {
+				tr {
+					th { +"Category" }
+					th { +"Roll" }
+					th { +"Score" }
+				}
+				
+				body()
+			}
+		}
+	}
+	
+	private fun RBuilder.scoreRow(game: Game, category: ScoreCategory, score: ScoredCategory)
+	{
+		tr {
+			td {
+				button {
+					+category.name
+					
+					attrs {
+						onClickFunction = {
+							setState {
+								game.assignRollTo(category)
+							}
+						}
+						disabled = score.isAssigned || game.roundCompleted()
+					}
+				}
+			}
+			
+			if (score.isAssigned)
+			{
+				td {
+					+score.diceRoll.asSequence().joinToString(" ")
+				}
+				td {
+					+score.score.toString()
+				}
+			}
+			else
+			{
+				td { +"-" }
+				td { +"-" }
 			}
 		}
 	}
